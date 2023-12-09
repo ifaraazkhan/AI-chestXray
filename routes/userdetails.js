@@ -48,7 +48,7 @@ router.post('/startTest', async(req,res)=>{
 
 router.get('/getProfile', async(req,res)=>{
   const userID = req.headers.user_id;
-  let sql = `select a.fullname,a.u_age,u.mobile,u.registration_no,u.ac_type_id from dc.account a , dc.users u where a.user_id = u.user_id and a.user_id = $1`;
+  let sql = `select a.fullname,a.u_age,u.mobile,u.registration_no,u.ac_type_id from ai.account a , ai.users u where a.user_id = u.user_id and a.user_id = $1`;
   let resp = await selectSql(sql,[userID]);
   res.send(resp);
 

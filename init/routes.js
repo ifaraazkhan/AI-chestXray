@@ -5,6 +5,7 @@ import cors from 'cors';
 import auth from '../routes/auth.js';
 import userdetails from '../routes/userdetails.js';
 import payments from '../routes/payments.js';
+import aiModel from '../routes/aiModel.js';
 
 import {schemaValidation, validateToken } from '../utils/middlewares.js';
 
@@ -31,6 +32,7 @@ const ROUTES = (server) => {
     server.use('/auth', [schemaValidation], auth);
     server.use('/user', [schemaValidation,validateToken], userdetails);
     server.use('/payment', [schemaValidation,validateToken], payments);
+    server.use('/ai', aiModel);
 };
 
 export default ROUTES;

@@ -32,6 +32,7 @@ const SCHEMAS = {
                 "password": { "type": "string", "minLength": 4 },
                 "account_type": { "type": "number", "minLength": 1 },
                 "otp":{ "type": "number", "minLength": 4 },
+                "register_type":{ "type": "string", "minLength": 1 },
             },
             "required": ["fullname", "mobile","password","account_type","otp"]
         }
@@ -75,10 +76,10 @@ const SCHEMAS = {
         {
             "type": "object",
             "properties": {
-                "age": { "type": "number", "minLength": 1 },
+                "fullname": { "type": "string", "minLength": 1 },
+                "u_age": { "type": "number", "minLength": 1 },
                 "password": { "type": "string", "minLength": 1 }
             },
-            "required": ["age"]
         }
     },
     'submitTest': {

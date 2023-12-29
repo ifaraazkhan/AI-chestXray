@@ -195,6 +195,15 @@ router.get('/checkPaymentStatus/:transactionID',async (req, res) => {
 
 });
 
+router.get('/getPaymentPlanDetail/:planID',async (req, res) => {
+  let planID = req.params.planID;
+  const userID = req.headers.user_id;
+
+  let sql = `select * from ai.subscription_plans sp where plan_id = $1`;
+  let resp = await selectSql(sql,[planID]);
+  res.send(resp);
+});
+
 let intervalId; // Store the interval ID to clear it when needed
 
 function scheduleStatusChecks(transactionId) {

@@ -55,15 +55,16 @@ router.get('/getProfile', async(req,res)=>{
 })
 
 router.post('/updateProfile', async(req,res)=>{
-  const {age,password} = req.body;
+  console.log('inside');
+  const {fullname,u_age,password} = req.body;
   const userID = req.headers.user_id;
 
-  let sql = `update dc.account set u_age = $1 where user_id = $2`;
-  let resp = await updateSql(sql,[age,userID]);
+  let sql = `update ai.account set u_age = $1,fullname = $2 where user_id = $3`;
+  let resp = await updateSql(sql,[u_age,fullname,userID]);
 
   if(password.trim() != '' || password != undefined){
     let password_ = md5(password);
-    sql = `update dc.users set "password" = $1 where user_id = $2`;
+    sql = `update ai.users set "password" = $1 where user_id = $2`;
     resp = await updateSql(sql,[password_,userID]);
   }
   res.send(resp);

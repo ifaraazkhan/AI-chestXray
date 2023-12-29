@@ -32,12 +32,21 @@ router.get('/health', (req, res) => {
   });
 
 router.post('/register', async (req, res) => {
-    const { fullname,mobile,password,registration_no,account_type,otp  } = req.body;
+  console.log(req.body);
+    const { fullname,mobile,password,registration_no,account_type,otp,register_type  } = req.body;
     if(fullname != undefined || mobile != undefined || password != undefined || account_type != undefined || otp != "" )
     {
+     
         let status = await checkUserAlreadyExists(mobile);
+        let validate;
         if(status){
-            let validate = await validateOTP(mobile,otp,'register');
+          if(register_type == 'quickPay'){
+            validate = true;
+          }
+          else{
+            validate = await validateOTP(mobile,otp,'register');
+          }
+            
             if(validate == true){
                 let sql ;
                 let resp ;

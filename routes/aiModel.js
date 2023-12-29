@@ -6,6 +6,8 @@ import path, { dirname } from 'path';
 import https from 'https';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import axios from 'axios';
+import FormData from 'form-data';
 
 import tf from '@tensorflow/tfjs-node';
 import multer from 'multer';
@@ -23,6 +25,7 @@ const upload = multer({ storage: storage });
 
 // Load model
 let model;
+
 async function loadModel() {
   try {
     const modelPath = new URL('../models/xrv-all-45rot15trans15scale/model.json', currentModuleURL);
@@ -80,6 +83,7 @@ function distOverClasses(values) {
         value_normalized = Math.min(1, value_normalized * MODEL_CONFIG.SCALE_UPPER);
       }
     }
+   // console.log(MODEL_CONFIG.LABELS[i] + ",pred:" + values[i] + "," + "OP_POINT:" + MODEL_CONFIG.OP_POINT[i] + "->normalized:" + value_normalized);
 
     topClassesAndProbs.push({
       className: MODEL_CONFIG.LABELS[i],
@@ -135,6 +139,71 @@ function normalizeHeatmap(heatmapData) {
   return heatmapData.map(value => value / maxIntensity);
 }
 
+
+// Function to predict TB
+const makeTBPrediction = async (imageBuffer,methodType) => {
+  try {
+    const headers = {
+      'Content-Type': 'multipart/form-data',
+    };
+
+    const formData = new FormData();
+    formData.append('image', imageBuffer, 'image.png');
+    formData.append('method', methodType);
+
+    const response = await axios.post('https://rap-ria.tbportals.niaid.nih.gov/TBorNotTB', formData, {
+      headers,
+    });
+
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+const TBResultCalculation = async(imageBuffer)=>{
+  let result = {};
+  const single_Method = await makeTBPrediction(imageBuffer,'single');
+  const single_2Method = await makeTBPrediction(imageBuffer,'single_2');
+  const ensemble_Method = await makeTBPrediction(imageBuffer,'ensemble');
+
+  let SM_prob = single_Method.probability_of_TB * 100;
+  let SM_decision = single_Method.decision;
+
+  let SM2_prob = single_2Method.probability_of_TB * 100;
+  let SM2_decision = single_2Method.decision;
+
+  let EM_prob = ensemble_Method.probability_of_TB * 100;
+  let EM_decision = ensemble_Method.decision;
+
+  // first check whether all method result is TB or not
+  if(SM_decision == 'TB' && SM2_decision == 'TB' && EM_decision == 'TB'){
+    result.TB = true;
+    result.Score = 99;
+  }
+  // if single + emsemble decision is TB or single2 + esemble is TB then TB 
+  else if ((SM2_decision == 'TB' && EM_decision == 'TB') || (SM_decision == 'TB' && EM_decision == 'TB')){
+    result.TB = true;
+    result.Score = 66;
+  }
+  else if (SM_decision == 'TB' || SM2_decision == 'TB' || EM_decision == 'TB'){
+    result.TB = true;
+    result.Score = 33;
+  }
+  else{
+    result.TB = false;
+    result.Score = 0;
+  }
+
+  console.log(result);
+
+  return result;
+
+
+
+}
+
+
 router.post('/predict', upload.single('image'), async (req, res) => {
   console.log('Incoming FormData:', req.body);
 
@@ -142,8 +211,20 @@ router.post('/predict', upload.single('image'), async (req, res) => {
     return res.status(400).send('No image uploaded.');
   }
 
+
+
   const imageBuffer = req.file.buffer;
   const tensor = prepareImage(imageBuffer);
+
+    // Make a prediction request using the function
+    let TBPredictionResult = '';
+    // try {
+    //   TBPredictionResult = await TBResultCalculation(imageBuffer);
+    //   console.log(TBPredictionResult);   
+    // } catch (error) {
+      
+    // }
+  
 
   const prediction = model.predict(tensor);
   const classes = await distOverClasses(prediction.dataSync());
@@ -152,7 +233,7 @@ router.post('/predict', upload.single('image'), async (req, res) => {
   // Generate the heatmap based on prediction and image data
  //const heatmap = generateHeatmap(prediction, tensor);
 
-  res.json({ classes });
+  res.json({ classes,TBPredictionResult });
 });
 
 export default router;

@@ -223,21 +223,21 @@ export const sha256Hash= async(input)=> {
             return false;
         }
         else{
-            if(plan_id == 9 || plan_id == 10){
+            if(plan_id == 9 || plan_id == 10 || plan_id == 11){
              sql =`insert into ai.user_plan_credits(user_id,plan_id,pg_id,expiry_date,credit_balance,created_at,created_by)
              values ($1,$2,$3,$4,$5,now(),$6)`;
              await insertSql(sql,[user_id,plan_id,pg_id,expiry_date,credits,user_id]);
              return true;
             }
             else {
-                sql = `insert into ai.user_subscription(user_id,pg_id,plan_id,start_date,end_date,created_at,created_by)
-                values ($1,$2,$3,$4,$5,now(),$6) returning subscription_id`;
-                let res = await insertSql(sql,[user_id,pg_id,plan_id,new Date(),expiry_date,user_id]);
+                sql = `insert into ai.user_subscription(user_id,pg_id,plan_id,start_date,end_date,created_at,created_by,available_credit)
+                values ($1,$2,$3,$4,$5,now(),$6,$7) returning subscription_id`;
+                let res = await insertSql(sql,[user_id,pg_id,plan_id,new Date(),expiry_date,user_id,credits]);
                 let subscription_id = res.results[0].subscription_id;
 
-                sql =`insert into ai.user_plan_credits(user_id,subscription_id,pg_id,expiry_date,credit_balance,created_at,created_by)
-            values ($1,$2,$3,$4,$5,now(),$6)`;
-            await insertSql(sql,[user_id,subscription_id,pg_id,expiry_date,credits,user_id]);
+            //     sql =`insert into ai.user_plan_credits(user_id,subscription_id,pg_id,expiry_date,credit_balance,created_at,created_by)
+            // values ($1,$2,$3,$4,$5,now(),$6)`;
+            // await insertSql(sql,[user_id,subscription_id,pg_id,expiry_date,credits,user_id]);
             return true;
 
             }

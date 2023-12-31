@@ -71,14 +71,13 @@ router.post('/updateProfile', async(req,res)=>{
 
 })
 
-router.get('/getMedicalRecordsbyID/:test_id', async(req,res)=>{
+router.get('/getReportbyID/:report_id', async(req,res)=>{
   const userID = req.headers.user_id;
-  let testID = req.params.test_id;
+  let reportID = req.params.report_id;
 
-  let sql = `select u.mobile,td.patient_name,td.patient_age,td.patient_gender,TO_CHAR(td.test_date, 'DD Month YYYY') AS test_date,TO_CHAR(td.test_date, 'HH:MI AM') AS test_time,
-  td.test_result_id,td.assessment_result as test_result,td.test_feedback  from dc.test_details td , dc.users u
-    where td.user_id = u.user_id and td.status = 'complete' and test_result_id  = $1 `;
-  let resp = await selectSql(sql,[testID]);
+  let sql = `select p_name,p_age,p_gender,p_mobile,input_xray,api_result,created_at from ai.user_test_results utr 
+  where status = 'active' and result_id = $1 and user_id = $2`;
+  let resp = await selectSql(sql,[reportID,userID]);
   res.send(resp);
 
 })
@@ -632,16 +631,65 @@ router.get('/getUserSubscriptions', async(req,res)=>{
   if(count == 0 && credit == 0){
     data.result = "no";
   }
+  else if(count != 0 ){
+    //get subscriptions details 
+    sql = `select us.subscription_id,us.start_date,us.end_date,us.available_credit,sp.test_type_id,sp.plan_name from ai.user_subscription us,ai.subscription_plans sp
+    where us.plan_id = sp.plan_id and us.status = 'A' and us.user_id = $1 order by subscription_id`;
+    resp = await selectSql(sql,[userID]);
+    if(resp.results.length > 0){
+      //console.log(resp.results);
+      let inputArray = resp.results;
+      const resultArray = [];
+    // Initialize sums for each test_type_id
+      const sumByTestType = { 1: 0, 2: 0 };
+    // Track plan_name with higher available_credit for each test_type_id
+      const higherCreditPlan = { 1: null, 2: null };
+
+    for (const obj of inputArray) {
+      const { available_credit, test_type_id, plan_name, end_date } = obj;
+      // Sum available_credit based on test_type_id
+      sumByTestType[test_type_id] += available_credit;
+      // Update plan_name with higher available_credit
+    if (higherCreditPlan[test_type_id] === null || available_credit > sumByTestType[test_type_id]) {
+      higherCreditPlan[test_type_id] = { plan_name, end_date: new Date(end_date).toLocaleDateString('en-GB') };
+     }
+    }
+
+  // Convert the results to the desired format
+    for (const test_type_id in sumByTestType) {
+      if (higherCreditPlan[test_type_id] !== null) {
+      resultArray.push({
+      test_type_id: parseInt(test_type_id),
+      sum_available_credit: sumByTestType[test_type_id],
+      ...higherCreditPlan[test_type_id]
+    });
+  }
+  }
+//console.log(resultArray);
+      data.result = "yes";
+    data.details = resultArray;
+  }
+
+   
+  }
   else if(count == 0 && credit != 0){
     data.result = "credit";
     data.credit = credit;
     data.planName = planName;
     data.planID = planID;
   }
-  else{
-    data.result = "yes";
-  }
   res.status(200).send({ status_code: 'ai200', message: 'Success', data:data });
+
+})
+
+
+router.get('/getSubscription_profile', async(req,res)=>{
+  const userID = req.headers.user_id;
+  console.log(userID);
+  let sql = `select us.subscription_id,TO_CHAR(us.start_date, 'DD/MM/YYYY') AS start_date,TO_CHAR(us.end_date, 'DD/MM/YYYY') AS end_date,us.pg_id,TO_CHAR(us.created_at, 'DD/MM/YYYY HH12:MI:SS AM') AS created_at,us.available_credit,sp.plan_name,sp.test_type_id from ai.user_subscription us,ai.subscription_plans sp
+  where us.plan_id = sp.plan_id and us.user_id = $1 order by subscription_id desc`;
+  let resp = await selectSql(sql,[userID]);
+  res.send(resp);
 
 })
 

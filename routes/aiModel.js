@@ -205,35 +205,71 @@ const TBResultCalculation = async(imageBuffer)=>{
 
 
 router.post('/predict', upload.single('image'), async (req, res) => {
-  console.log('Incoming FormData:', req.body);
+  const userID = req.headers.user_id;
+  console.log(userID);
+  //console.log('Incoming FormData:', req.body);
+  let { name, mobile,age,gender,testTypeID } = req.body;
 
   if (!req.file) {
     return res.status(400).send('No image uploaded.');
   }
 
+  if(testTypeID == 0 || testTypeID == '0'){
+    return res.status(400).send('Test Type should not be 0');
+  }
+  // testTypeID -----> 1- Digital Pathology 2- TB Scan 3-Combine Scan 
 
+  let classes = '';
+  let TBPredictionResult = '';
 
   const imageBuffer = req.file.buffer;
   const tensor = prepareImage(imageBuffer);
-
-    // Make a prediction request using the function
-    let TBPredictionResult = '';
-    // try {
-    //   TBPredictionResult = await TBResultCalculation(imageBuffer);
-    //   console.log(TBPredictionResult);   
-    // } catch (error) {
-      
-    // }
   
-
-  const prediction = model.predict(tensor);
-  const classes = await distOverClasses(prediction.dataSync());
-  //console.log(classes);
+  if(testTypeID == 1){
+        // only Digital Pathology
+        console.log('inside only Digital Pathology');
+      try {
+      const prediction = model.predict(tensor);
+      classes = await distOverClasses(prediction.dataSync());
+      } catch (error) {
+      }
+    }
+  else if(testTypeID == 2){
+        // only TB analysis
+        console.log('inside only TB analysis');
+        try {
+        TBPredictionResult = await TBResultCalculation(imageBuffer);
+        console.log(TBPredictionResult);   
+        } catch (error) {
+        }
+    }
+    else if(testTypeID == 3){
+      // Combined Digital Pathology + TB
+      console.log('inside Combined Digital Pathology + TB');
+      try {
+        const prediction = model.predict(tensor);
+        classes = await distOverClasses(prediction.dataSync());
+      } catch (error) {
+        
+      }
+      // try {
+      //   TBPredictionResult = await TBResultCalculation(imageBuffer);
+      //   console.log(TBPredictionResult);   
+      //   } catch (error) {
+      //   }
+    }
 
   // Generate the heatmap based on prediction and image data
  //const heatmap = generateHeatmap(prediction, tensor);
+ let resulttoDB = { classes,TBPredictionResult };
+  let sql_result = `INSERT INTO ai.user_test_results
+  (user_id, credit_id, subscription_id, test_type_id, p_name, p_age, p_gender, p_mobile, input_xray, api_result, tb_api_response, created_at, created_by)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12) returning result_id`;
+  let response = await selectSql(sql_result,[userID,0,0,parseInt(testTypeID, 10),name,age,gender,mobile,'s3',resulttoDB,TBPredictionResult,userID]);
+  console.log(response);
+  let reportID = response.results[0].result_id;
 
-  res.json({ classes,TBPredictionResult });
+  res.json({ classes,TBPredictionResult,reportID });
 });
 
 export default router;

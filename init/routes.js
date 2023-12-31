@@ -32,7 +32,7 @@ const ROUTES = (server) => {
     server.use('/auth', [schemaValidation], auth);
     server.use('/user', [schemaValidation,validateToken], userdetails);
     server.use('/payment', [schemaValidation,validateToken], payments);
-    server.use('/ai', aiModel);
+    server.use('/ai',[validateToken], aiModel);
 };
 
 export default ROUTES;

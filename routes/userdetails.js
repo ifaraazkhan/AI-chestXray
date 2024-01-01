@@ -615,17 +615,18 @@ router.post('/deleteAccount', async(req,res)=>{
 router.get('/getUserSubscriptions', async(req,res)=>{
   const userID = req.headers.user_id;
   console.log(userID);
-  let sql = `select count(*) from ai.user_subscription where status ='A' and user_id = $1`;
+  let sql = `select count(*) from ai.user_subscription where status ='A' and available_credit > 0 and user_id = $1`;
   let resp = await selectSql(sql,[userID]);
   let count = resp.results[0].count;
-  sql = `SELECT COALESCE((upc.credit_balance), 0) as total_credit, sp.plan_name,sp.plan_id FROM ai.user_plan_credits upc,ai.subscription_plans sp 
+  sql = `SELECT COALESCE((upc.credit_balance), 0) as total_credit, sp.plan_name,sp.plan_id,upc.id as credit_id FROM ai.user_plan_credits upc,ai.subscription_plans sp 
   where upc.plan_id = sp.plan_id and upc.status = 'active' and upc.user_id = $1 order by upc.id desc limit 1`;
   resp = await selectSql(sql,[userID]);
-  let credit = 0;let planName = ''; let planID = '';
+  let credit = 0;let planName = ''; let planID = ''; let credit_id = '';
   if(resp.results.length > 0){
     credit = resp.results[0].total_credit;
     planName = resp.results[0].plan_name;
     planID = resp.results[0].plan_id;
+    credit_id = resp.results[0].credit_id;
   }
   let data = {};
   if(count == 0 && credit == 0){
@@ -661,6 +662,9 @@ router.get('/getUserSubscriptions', async(req,res)=>{
       resultArray.push({
       test_type_id: parseInt(test_type_id),
       sum_available_credit: sumByTestType[test_type_id],
+      subscription_id: inputArray
+        .filter(obj => obj.test_type_id === parseInt(test_type_id) && obj.plan_name === higherCreditPlan[test_type_id].plan_name)
+        .map(obj => obj.subscription_id),
       ...higherCreditPlan[test_type_id]
     });
   }
@@ -677,6 +681,7 @@ router.get('/getUserSubscriptions', async(req,res)=>{
     data.credit = credit;
     data.planName = planName;
     data.planID = planID;
+    data.credit_id = credit_id;
   }
   res.status(200).send({ status_code: 'ai200', message: 'Success', data:data });
 
@@ -688,6 +693,15 @@ router.get('/getSubscription_profile', async(req,res)=>{
   console.log(userID);
   let sql = `select us.subscription_id,TO_CHAR(us.start_date, 'DD/MM/YYYY') AS start_date,TO_CHAR(us.end_date, 'DD/MM/YYYY') AS end_date,us.pg_id,TO_CHAR(us.created_at, 'DD/MM/YYYY HH12:MI:SS AM') AS created_at,us.available_credit,sp.plan_name,sp.test_type_id from ai.user_subscription us,ai.subscription_plans sp
   where us.plan_id = sp.plan_id and us.user_id = $1 order by subscription_id desc`;
+  let resp = await selectSql(sql,[userID]);
+  res.send(resp);
+
+})
+
+router.get('/getAllUserReport', async(req,res)=>{
+  const userID = req.headers.user_id;
+  let sql = `select result_id,p_name,p_age,p_gender,p_mobile,test_type_id,TO_CHAR(created_at, 'DD/MM/YYYY') AS test_date from ai.user_test_results where status = 'active'
+   and user_id = $1 order by result_id desc`;
   let resp = await selectSql(sql,[userID]);
   res.send(resp);
 

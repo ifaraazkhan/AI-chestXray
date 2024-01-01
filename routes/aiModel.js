@@ -206,16 +206,23 @@ const TBResultCalculation = async(imageBuffer)=>{
 
 router.post('/predict', upload.single('image'), async (req, res) => {
   const userID = req.headers.user_id;
-  console.log(userID);
+  //console.log(userID);
   //console.log('Incoming FormData:', req.body);
-  let { name, mobile,age,gender,testTypeID } = req.body;
+  let { name, mobile,age,gender,testTypeID,credit_id,subs_id } = req.body;
+  testTypeID = parseInt(testTypeID, 10);
+  credit_id = parseInt(credit_id, 10);
+  subs_id = parseInt(subs_id, 10);
+
+  console.log("testTypeID",testTypeID);
+  console.log("creditID",credit_id);
+  console.log("subsID",subs_id);
 
   if (!req.file) {
     return res.status(400).send('No image uploaded.');
   }
 
-  if(testTypeID == 0 || testTypeID == '0'){
-    return res.status(400).send('Test Type should not be 0');
+  if(testTypeID == 0 && (credit_id == 0 || subs_id == 0)){
+    return res.status(400).send('Test Type or (subs and credit) should not be 0');
   }
   // testTypeID -----> 1- Digital Pathology 2- TB Scan 3-Combine Scan 
 
@@ -265,8 +272,18 @@ router.post('/predict', upload.single('image'), async (req, res) => {
   let sql_result = `INSERT INTO ai.user_test_results
   (user_id, credit_id, subscription_id, test_type_id, p_name, p_age, p_gender, p_mobile, input_xray, api_result, tb_api_response, created_at, created_by)
   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12) returning result_id`;
-  let response = await selectSql(sql_result,[userID,0,0,parseInt(testTypeID, 10),name,age,gender,mobile,'s3',resulttoDB,TBPredictionResult,userID]);
-  console.log(response);
+  let response = await selectSql(sql_result,[userID,credit_id,subs_id,parseInt(testTypeID, 10),name,age,gender,mobile,'s3',resulttoDB,TBPredictionResult,userID]);
+  //console.log(response);
+  // now do -1 from the subs-credit or credit only 
+  if(credit_id != 0 && subs_id == 0){
+    console.log('inside --- credit');
+    let sql_deduct = `update ai.user_plan_credits set credit_balance = 0 and status = 'USED' where id = $1`;
+    await updateSql(sql_deduct,[credit_id]);
+  }else if(credit_id == 0 && subs_id != 0){
+    console.log('inside --- subs');
+    let sql_deduct = `update ai.user_subscription set available_credit = available_credit - 1 where subscription_id = $1`;
+    await updateSql(sql_deduct,[subs_id]);
+  }
   let reportID = response.results[0].result_id;
 
   res.json({ classes,TBPredictionResult,reportID });
